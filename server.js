@@ -99,10 +99,9 @@ app.post('/chat/login', async (req, res) => {
     where: { email }
   });
 
-const valid = await bcrypt.compare(password, admin.password)
-if (!admin || !valid) {
-  return res.status(401).json({ error: "Invalid" })
-}
+  if (!admin || admin.password !== password) {
+    return res.status(401).json({ error: "Invalid" });
+  }
 
   const token = jwt.sign(
     { id: admin.id, email: admin.email },
