@@ -93,44 +93,36 @@ app.post('/chat', async (req, res) => {
 });
 
 app.post('/chat/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body
 
-  const admin = await prisma.admin.findUnique({
-    where: { email }
-  });
-
+  const admin = await prisma.admin.findUnique({ where: { email } })
   if (!admin || admin.password !== password) {
-    return res.status(401).json({ error: "Invalid" });
+    return res.status(401).json({ error: "Invalid" })
   }
 
   const token = jwt.sign(
     { id: admin.id, email: admin.email },
-    process.env.JWT_SECRET
-  );
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  )
 
-res.cookie("auth_token", token, {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  path: "/", 
-  maxAge: 7 * 24 * 60 * 60 * 1000
+  res.json({ token }) // ✅ SEND TOKEN
 })
 
-return res.json({ success: true })
 
-  
-});
+app.get("/chat/auth-check", (req, res) => {
+  try {
+    const auth = req.headers.authorization
+    if (!auth) return res.json({ authenticated: false })
 
-app.post('/chat/auth', (req, res) => {
-  const { username, password } = req.body;
+    const token = auth.split(" ")[1]
+    jwt.verify(token, process.env.JWT_SECRET)
 
-  if (
-    username === process.env.ADMIN_USERNAME &&
-    password === process.env.ADMIN_PASSWORD
-  ) return res.json({ ok: true });
-
-  res.status(401).json({ error: "Unauthorized" });
-});
+    res.json({ authenticated: true })
+  } catch {
+    res.json({ authenticated: false })
+  }
+})
 
 app.post('/chat/ask-email', async (req, res) => {
   const { email, question } = req.body;
