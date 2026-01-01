@@ -13,11 +13,23 @@ const nodemailer = require('nodemailer');
 const app = express();
 
 
-const uploadsDir = path.join(process.cwd(), "uploads");
+const { CloudinaryStorage } = require("multer-storage-cloudinary")
+const cloudinary = require("./cloudinary")
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => ({
+    folder: "carconnect",
+    resource_type: file.mimetype.startsWith("video")
+      ? "video"
+      : "image"
+  })
+})
+
+const upload = multer({ storage })
+
+
+
 
 
 
@@ -39,7 +51,7 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(uploadsDir));
+
 
 // Routes
 
@@ -87,9 +99,10 @@ app.post('/chat/login', async (req, res) => {
     where: { email }
   });
 
-  if (!admin || admin.password !== password) {
-    return res.status(401).json({ error: "Invalid" });
-  }
+const valid = await bcrypt.compare(password, admin.password)
+if (!admin || !valid) {
+  return res.status(401).json({ error: "Invalid" })
+}
 
   const token = jwt.sign(
     { id: admin.id, email: admin.email },
@@ -105,7 +118,7 @@ res.cookie("auth_token", token, {
 
 return res.json({ success: true })
 
-  res.json({ success: true });
+  
 });
 
 app.post('/chat/auth', (req, res) => {
@@ -240,28 +253,22 @@ app.post('/contact', async (req, res) => {
   }
 });
 
-// Upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
-});
-
-
-const upload = multer({ storage });
-
 app.post('/upload', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false });
+      return res.status(400).json({ success: false })
     }
 
-    const url = `${process.env.API_BASE_URL}/uploads/${req.file.filename}`;
-    res.json({ url });
+    res.json({
+      url: req.file.path // ✅ Cloudinary URL
+    })
+
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ success: false });
+    console.error("Upload error:", error)
+    res.status(500).json({ success: false })
   }
-});
+})
+
 
 // Logout
 app.post("/logout", (req, res) => {
