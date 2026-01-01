@@ -89,13 +89,14 @@ app.post('/chat/login', async (req, res) => {
     process.env.JWT_SECRET
   );
 
-  res.cookie("auth_token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: 'strict',
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7 // 7 days
-  });
+res.cookie("auth_token", token, {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+  maxAge: 7 * 24 * 60 * 60 * 1000
+})
+
+return res.json({ success: true })
 
   res.json({ success: true });
 });
@@ -259,10 +260,16 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 // Logout
-app.post('/logout', (req, res) => {
-  res.clearCookie('auth_token');
-  res.json({ success: true });
-});
+app.post("/logout", (req, res) => {
+  res.clearCookie("auth_token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none"
+  })
+
+  res.json({ success: true })
+})
+
 app.get("/chat/auth-check", (req, res) => {
   try {
     const token = req.cookies.auth_token;
