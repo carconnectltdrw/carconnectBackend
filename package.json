@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "postinstall": "npx prisma generate"
+    "postinstall": "chmod +x ./node_modules/.bin/prisma && npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
@@ -28,5 +28,8 @@
     "nodemon": "^3.0.2",
     "prisma": "^5.19.1",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
