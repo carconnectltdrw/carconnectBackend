@@ -20,10 +20,16 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-app.use(cors({
-  origin: 'http://localhost:3000', // Frontend URL
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "https://carconnectltd.netlify.app",
+      "http://localhost:3000"
+    ],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
