@@ -1,0 +1,31 @@
+datasource db {
+  provider = "postgresql" // or mysql/sqlite
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Admin {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+}
+
+model Project {
+  id        Int    @id @default(autoincrement())
+  title     String
+  status    String
+  poster    String
+  video     String?
+  createdAt DateTime @default(now())
+}
+
+model App {
+  id        Int    @id @default(autoincrement())
+  name      String
+  thumbnail String
+  playstore String?
+  appstore  String?
+}
