@@ -263,6 +263,18 @@ app.post('/logout', (req, res) => {
   res.clearCookie('auth_token');
   res.json({ success: true });
 });
+app.get("/chat/auth-check", (req, res) => {
+  try {
+    const token = req.cookies.auth_token;
+    if (!token) return res.json({ authenticated: false });
+
+    jwt.verify(token, process.env.JWT_SECRET);
+    res.json({ authenticated: true });
+
+  } catch {
+    res.json({ authenticated: false });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
