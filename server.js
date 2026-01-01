@@ -1,4 +1,3 @@
-import path from "path"
 
 const express = require('express');
 const cors = require('cors');
@@ -12,8 +11,7 @@ const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 
 const app = express();
-const path = require("path");
-const fs = require("fs");
+
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 
@@ -21,7 +19,7 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-app.use("/uploads", express.static(uploadsDir));
+
 
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
