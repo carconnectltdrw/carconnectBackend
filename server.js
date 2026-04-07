@@ -30,7 +30,15 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage })
 
-
+const KNOWLEDGE_BASE = {
+  ceo: "Promesse Irakoze",
+  chairman: "John Mugiraneza",
+  description: "CarConnect Ltd is a smart mobility & logistics technology company in Rwanda.",
+  services: "We provide smart transport, fleet & logistics tech solutions.",
+  projects: "Car Renting App, Muv Car App",
+  location: "Kicukiro, Kigali, Rwanda",
+  contact: "Please email carconnectltd.rw@gmail.com or WhatsApp +250780114522."
+};
 
 
 
@@ -57,36 +65,37 @@ app.use(cookieParser());
 
 // Routes
 
-function findFAQAnswer(message) {
-  const FAQS = [
-    {
-      q: ["hi","hello","hey","salute","greetings"],
-      a: "Hello! 👋 Welcome to CarConnect Ltd. How can we help?"
-    },
-    {
-      q: ["what is carconnect","who are you"],
-      a: "CarConnect Ltd is a smart mobility & logistics technology company in Rwanda."
-    },
-    {
-      q: ["services","what do you do","solutions"],
-      a: "We provide smart transport, fleet & logistics tech solutions."
-    },
-    {
-      q: ["contact","email","support"],
-      a: "Please email carconnectltd.rw@gmail.com or WhatsApp +250780114522."
-    },
-    {
-      q: ["app","mobile app","when is app ready"],
-      a: "Our mobile app is coming soon 🚀 stay tuned!"
-    }
-  ];
-
+function findKnowledgeAnswer(message) {
   const text = String(message || '').toLowerCase();
-  for (const faq of FAQS) {
-    if (faq.q.some(k => text.includes(k))) {
-      return faq.a;
-    }
+
+  if (text.includes('ceo') || text.includes('promesse')) {
+    return `Our CEO is ${KNOWLEDGE_BASE.ceo}.`;
   }
+
+  if (text.includes('chairman') || text.includes('john')) {
+    return `Our Chairman is ${KNOWLEDGE_BASE.chairman}.`;
+  }
+
+  if (text.includes('services') || text.includes('what do you do') || text.includes('solutions')) {
+    return KNOWLEDGE_BASE.services;
+  }
+
+  if (text.includes('projects') || text.includes('apps')) {
+    return `Our projects include ${KNOWLEDGE_BASE.projects}.`;
+  }
+
+  if (text.includes('location') || text.includes('where')) {
+    return `We are located in ${KNOWLEDGE_BASE.location}.`;
+  }
+
+  if (text.includes('contact') || text.includes('email') || text.includes('support')) {
+    return KNOWLEDGE_BASE.contact;
+  }
+
+  if (text.includes('what is carconnect') || text.includes('who are you')) {
+    return KNOWLEDGE_BASE.description;
+  }
+
   return null;
 }
 
@@ -96,11 +105,11 @@ app.post('/chat', async (req, res) => {
 
   console.log('Incoming:', message);
 
-  // 🔹 FAQ CHECK
-  const faqAnswer = findFAQAnswer(message);
+  // 🔹 KNOWLEDGE BASE CHECK
+  const knowledgeAnswer = findKnowledgeAnswer(message);
 
-  if (faqAnswer) {
-    return res.json({ reply: faqAnswer });
+  if (knowledgeAnswer) {
+    return res.json({ reply: knowledgeAnswer });
   }
 
   // 🔹 AI CALL (Groq)
@@ -108,7 +117,7 @@ app.post('/chat', async (req, res) => {
 
   if (!apiKey) {
     console.error("❌ GROQ_API_KEY missing");
-    return res.json({ reply: "Server configuration error." });
+    return res.json({ reply: "I'm having trouble answering right now. Please try again." });
   }
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -126,10 +135,20 @@ app.post('/chat', async (req, res) => {
 You are CarConnect Assistant.
 
 Rules:
+- Use ONLY verified information about CarConnect
+- Never make up facts about the company
+- If information is not known, say: 'I'm not sure about that, but I can help you find out.'
 - Be friendly and natural
-- Answer general questions like a human (e.g. greetings, small talk)
-- Focus on CarConnect when relevant
-- Do NOT always return the welcome message
+- Do not repeat greeting unless user greets first
+- Keep answers concise
+
+CarConnect Ltd is a smart mobility & logistics technology company in Rwanda.
+CEO: Promesse Irakoze
+Chairman: John Mugiraneza
+Services: smart transport, fleet & logistics tech solutions.
+Projects: Car Renting App, Muv Car App
+Location: Kicukiro, Kigali, Rwanda
+Contact: carconnectltd.rw@gmail.com or WhatsApp +250780114522
 `
         },
         ...history,
@@ -144,13 +163,13 @@ Rules:
 
   if (!response.ok) {
     console.error('Groq API error:', data);
-    return res.json({ reply: 'I\'m having trouble connecting to AI right now.' });
+    return res.json({ reply: 'I\'m having trouble answering right now. Please try again.' });
   }
 
   const reply = data?.choices?.[0]?.message?.content;
 
   if (!reply) {
-    return res.json({ reply: 'I\'m having trouble connecting to AI right now.' });
+    return res.json({ reply: 'I\'m having trouble answering right now. Please try again.' });
   }
 
   return res.json({ reply });
