@@ -1,74 +1,91 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// FAQs
+const faqs = {
+  "what is carconnect": "CarConnect Ltd is a company based in Rwanda that builds secure, trusted platforms for transportation and logistics, bridging technology and traditional mobility.",
+  "what does carconnect do": "CarConnect provides vehicle management, delivery and real-time tracking, and enterprise fleet solutions to improve transportation efficiency digitally.",
+  "how to contact carconnect": "You can contact us via email at carconnectltd.rw@gmail.com, call +250 780 114 522, or visit us in Kicukiro, Kigali – Rwanda.",
+  "what services does carconnect offer": "We offer mobility apps, package delivery with tracking, and enterprise fleet management solutions.",
+  "where is carconnect located": "CarConnect is located in Kicukiro, Kigali – Rwanda.",
+};
 
-const SYSTEM_PROMPT = `You are CarConnect Assistant, an intelligent, professional, and human-like AI representing CarConnect Ltd, a smart mobility and logistics company based in Kigali, Rwanda.
-
-Your goals:
-- Help users understand CarConnect services and features.
-- Answer ANY user question, even if not related to CarConnect.
-- Always try to interpret the user's intent, even if the question is short, unclear, or poorly written.
-
-Behavior rules:
-- Never reject valid or simple questions.
-- If the question is about CarConnect → give a clear and confident answer.
-- If the question is general → answer it correctly, then gently relate it to CarConnect when appropriate.
-- Keep answers concise first, then expand if needed.
-- Use simple, natural, human-like language.
-- Avoid saying "I don't understand" unless absolutely necessary.
-- Handle errors or uncertainty by giving the best possible explanation.
-- Be friendly, calm, and helpful.
-
-CarConnect context:
-CarConnect Ltd provides:
-- Vehicle management
-- Delivery and real-time tracking
-- Enterprise fleet solutions
-
-It helps users manage cars, track deliveries, and improve transportation efficiency digitally.
-
-Style:
-- Conversational and professional
-- Clear and structured
-- Helpful and solution-oriented
-
-Always end with a helpful follow-up like:
-"Would you like more details?" or "How can I assist you further?"`;
+// Function to detect FAQ
+function detectFAQ(message: string): string | null {
+  const lowerMessage = message.toLowerCase();
+  for (const [key, value] of Object.entries(faqs)) {
+    if (lowerMessage.includes(key)) {
+      return value;
+    }
+  }
+  return null;
+}
 
 export async function POST(req: Request) {
   try {
-    const { message, history }: { message: string; history?: { role: string; content: string }[] } = await req.json();
+    const { message, history = [], userName }: { message: string; history?: { role: string; content: string }[]; userName?: string } = await req.json();
 
     if (!message || typeof message !== 'string') {
-      return Response.json({ reply: "I'm sorry, I didn't receive a valid message. Could you please try again?" }, { status: 400 });
+      return NextResponse.json({ reply: 'Invalid message provided.' }, { status: 400 });
     }
 
-    // Build the conversation context
-    let conversation = SYSTEM_PROMPT + '\n\n';
+    if (!process.env.GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is missing');
+      return NextResponse.json({ reply: 'Server configuration error.' }, { status: 500 });
+    }
 
-    if (history && Array.isArray(history)) {
-      // Include last 3-5 messages for context
-      const recentHistory = history.slice(-5);
-      for (const msg of recentHistory) {
-        if (msg.role === 'user') {
-          conversation += `User: ${msg.content}\n`;
-        } else if (msg.role === 'assistant') {
-          conversation += `Assistant: ${msg.content}\n`;
+    const faqAnswer = detectFAQ(message);
+
+    console.log("FAQ:", faqAnswer);
+    console.log("Message:", message);
+
+    let reply = "";
+
+    if (faqAnswer && message.length < 40) {
+      reply = faqAnswer;
+    } else {
+      const messages = [
+        {
+          role: 'system',
+          content: `You are CarConnect Assistant, a friendly AI assistant focused on CarConnect-related services. You provide helpful, accurate responses about CarConnect's smart mobility and logistics solutions. If a question is unrelated, respond helpfully anyway. Never return empty responses.`
+        },
+        ...history.slice(-10),
+        {
+          role: 'user',
+          content: message
         }
+      ];
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: messages
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Groq API error:', response.status, response.statusText);
+        return NextResponse.json({ reply: 'I\'m not sure how to respond to that right now.' }, { status: 500 });
+      }
+
+      const data = await response.json();
+
+      console.log('Groq response:', data);
+
+      reply = data?.choices?.[0]?.message?.content || 'I\'m not sure how to respond to that right now.';
+
+      if (!reply.trim()) {
+        reply = 'I\'m not sure how to respond to that right now.';
       }
     }
 
-    conversation += `User: ${message}\nAssistant:`;
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const result = await model.generateContent(conversation);
-    const response = await result.response;
-    const reply = response.text().trim();
-
-    return Response.json({ reply });
+    return NextResponse.json({ reply });
   } catch (error) {
-    console.error('Error generating response:', error);
-    return Response.json({ reply: "I'm experiencing some technical difficulties right now. Please try again in a moment, or contact our support team at carconnectltd.rw@gmail.com." }, { status: 500 });
+    console.error('Error in /api/chat:', error);
+    return NextResponse.json({ reply: 'Server error. Please try again.' }, { status: 500 });
   }
 }

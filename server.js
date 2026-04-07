@@ -5,6 +5,8 @@ const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config();
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -55,8 +57,7 @@ app.use(cookieParser());
 
 // Routes
 
-// Chat routes
-app.post('/chat', async (req, res) => {
+function findFAQAnswer(message) {
   const FAQS = [
     {
       q: ["hi","hello","hey","salute","greetings"],
@@ -80,16 +81,79 @@ app.post('/chat', async (req, res) => {
     }
   ];
 
-  const { message } = req.body;
-  const text = message.toLowerCase();
-
-  for (const f of FAQS) {
-    if (f.q.some(k => text.includes(k))) {
-      return res.json({ found: true, answer: f.a });
+  const text = String(message || '').toLowerCase();
+  for (const faq of FAQS) {
+    if (faq.q.some(k => text.includes(k))) {
+      return faq.a;
     }
   }
+  return null;
+}
 
-  res.json({ found: false });
+// Chat routes
+app.post('/chat', async (req, res) => {
+  const { message, history = [] } = req.body;
+
+  console.log('Incoming:', message);
+
+  // 🔹 FAQ CHECK
+  const faqAnswer = findFAQAnswer(message);
+
+  if (faqAnswer) {
+    return res.json({ reply: faqAnswer });
+  }
+
+  // 🔹 AI CALL (Groq)
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    console.error("❌ GROQ_API_KEY missing");
+    return res.json({ reply: "Server configuration error." });
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        {
+          role: 'system',
+          content: `
+You are CarConnect Assistant.
+
+Rules:
+- Be friendly and natural
+- Answer general questions like a human (e.g. greetings, small talk)
+- Focus on CarConnect when relevant
+- Do NOT always return the welcome message
+`
+        },
+        ...history,
+        { role: 'user', content: message }
+      ]
+    })
+  });
+
+  const data = await response.json();
+
+  console.log("FULL GROQ RESPONSE:", JSON.stringify(data, null, 2));
+
+  if (!response.ok) {
+    console.error('Groq API error:', data);
+    return res.json({ reply: 'I\'m having trouble connecting to AI right now.' });
+  }
+
+  const reply = data?.choices?.[0]?.message?.content;
+
+  if (!reply) {
+    return res.json({ reply: 'I\'m having trouble connecting to AI right now.' });
+  }
+
+  return res.json({ reply });
 });
 
 app.post('/chat/login', async (req, res) => {
@@ -146,33 +210,48 @@ app.post('/chat/ask-email', async (req, res) => {
 
 // Projects
 app.get('/chat/projects', async (req, res) => {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-  res.json(projects);
+  try {
+    const projects = await prisma.project.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(projects);
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ error: 'Failed to fetch projects' });
+  }
 });
 
 app.post('/chat/projects', async (req, res) => {
-  const body = req.body;
+  try {
+    const body = req.body;
 
-  const project = await prisma.project.create({
-    data: {
-      title: body.title,
-      status: body.type,
-      poster: body.mediaUrl,
-      video: body.videoUrl
-    },
-  });
+    const project = await prisma.project.create({
+      data: {
+        title: body.title,
+        status: body.type,
+        poster: body.mediaUrl,
+        video: body.videoUrl
+      },
+    });
 
-  res.json(project);
+    res.json(project);
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: 'Failed to create project' });
+  }
 });
 
 app.delete('/chat/projects/:id', async (req, res) => {
-  const { id } = req.params;
-  await prisma.project.delete({
-    where: { id: parseInt(id) }
-  });
-  res.json({ success: true });
+  try {
+    const { id } = req.params;
+    await prisma.project.delete({
+      where: { id: parseInt(id) }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: 'Failed to delete project' });
+  }
 });
 
 // Apps
