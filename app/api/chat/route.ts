@@ -9,9 +9,46 @@ const faqs = {
   "where is carconnect located": "CarConnect is located in Kicukiro, Kigali – Rwanda.",
 };
 
+function detectDateTime(message: string): string | null {
+  const lowerMessage = message.toLowerCase();
+  const isDateTimeInquiry =
+    lowerMessage.includes('what time') ||
+    lowerMessage.includes('time is it') ||
+    lowerMessage.includes('current time') ||
+    lowerMessage.includes('time of day') ||
+    lowerMessage.includes('what date') ||
+    lowerMessage.includes('date is it') ||
+    lowerMessage.includes('what day') ||
+    lowerMessage.includes('day is it');
+
+  if (!isDateTimeInquiry) {
+    return null;
+  }
+
+  const now = new Date();
+  const timeString = now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  const dateString = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  return `Right now it is ${timeString} on ${dateString}. I can also share how to download our Muv Car app if you'd like.`;
+}
+
 // Function to detect FAQ
 function detectFAQ(message: string): string | null {
   const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('muv car') || lowerMessage.includes('muvcar')) {
+    return 'Muv Car is our current app project, a friendly mobility app. If you want, I can help you find the download page.';
+  }
+
   for (const [key, value] of Object.entries(faqs)) {
     if (lowerMessage.includes(key)) {
       return value;
@@ -33,14 +70,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ reply: 'Server configuration error.' }, { status: 500 });
     }
 
+    const dateTimeAnswer = detectDateTime(message);
     const faqAnswer = detectFAQ(message);
 
+    console.log("Date/Time:", dateTimeAnswer);
     console.log("FAQ:", faqAnswer);
     console.log("Message:", message);
 
     let reply = "";
 
-    if (faqAnswer && message.length < 40) {
+    if (dateTimeAnswer) {
+      reply = dateTimeAnswer;
+    } else if (faqAnswer && message.length < 40) {
       reply = faqAnswer;
     } else {
       const messages = [

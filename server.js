@@ -52,8 +52,9 @@ const PORT = process.env.PORT || 5000;
 app.use(
   cors({
     origin: [
-      "https://carconnectltd.netlify.app",
-      "http://localhost:3000"
+    "https://getcarconnect.com",
+    "https://www.getcarconnect.com",
+    "http://localhost:3000"
     ],
     credentials: true,
   })
@@ -80,6 +81,14 @@ function findKnowledgeAnswer(message) {
     return KNOWLEDGE_BASE.services;
   }
 
+  if (text.includes('muv car') || text.includes('muvcar')) {
+    return 'Muv Car is our current app project, a friendly mobility app. If you want, I can share how to download it.';
+  }
+
+  if ((text.includes('download') || text.includes('install')) && text.includes('muv')) {
+    return 'You can download the Muv Car app from our website. I can help you with the download link if you like.';
+  }
+
   if (text.includes('projects') || text.includes('apps')) {
     return `Our projects include ${KNOWLEDGE_BASE.projects}.`;
   }
@@ -99,11 +108,47 @@ function findKnowledgeAnswer(message) {
   return null;
 }
 
+function getFriendlyDateTimeAnswer(message) {
+  const text = String(message || '').toLowerCase();
+  const isDateTimeInquiry =
+    text.includes('what time') ||
+    text.includes('time is it') ||
+    text.includes('current time') ||
+    text.includes('time of day') ||
+    text.includes('what date') ||
+    text.includes('date is it') ||
+    text.includes('what day') ||
+    text.includes('day is it');
+
+  if (!isDateTimeInquiry) return null;
+
+  const now = new Date();
+  const timeString = now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  const dateString = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  return `Right now it is ${timeString} on ${dateString}. If you want, I can also tell you how to download our Muv Car app.`;
+}
+
 // Chat routes
 app.post('/chat', async (req, res) => {
   const { message, history = [] } = req.body;
 
   console.log('Incoming:', message);
+
+  // 🔹 DATE / TIME CHECK
+  const dateTimeAnswer = getFriendlyDateTimeAnswer(message);
+  if (dateTimeAnswer) {
+    return res.json({ reply: dateTimeAnswer });
+  }
 
   // 🔹 KNOWLEDGE BASE CHECK
   const knowledgeAnswer = findKnowledgeAnswer(message);
